@@ -15,8 +15,8 @@ namespace GrapplingHookTweaks.Plugin
 			h.PatchAll();
 		}
 
-		public static bool disableWindowBreakFeature = false; // Endless Floors Comp :)
-		public static bool disableDoorOpeningFeature = false; // Maybe Endless Floors too???
+		public static bool disableWindowBreakFeature = false;
+		public static bool disableDoorOpeningFeature = false;
 	}
 
 	static class ModInfo
@@ -28,6 +28,8 @@ namespace GrapplingHookTweaks.Plugin
 		public const string PLUGIN_VERSION = "1.0.0";
 	}
 
+	// *********** Grappling Hook Patches ***********
+
 	[HarmonyPatch(typeof(ITM_GrapplingHook))]
 	public class GrapplingHookPatch
 	{
@@ -36,8 +38,6 @@ namespace GrapplingHookTweaks.Plugin
 		[HarmonyPrefix]
 		private static bool CheckForPassableObjects(ITM_GrapplingHook __instance, PlayerManager ___pm, ref RaycastHit hit, LayerMaskObject ___layerMask, bool ___locked, float ___speed, EnvironmentController ___ec) // anything in here should make the grappling hook pass so it doesn't lock in it
 		{
-			if (BasePlugin.disableDoorOpeningFeature && BasePlugin.disableWindowBreakFeature)
-				return true;
 
 			var comp = __instance.GetComponent<GrapplingHookExtraComponent>();
 			if (!BasePlugin.disableWindowBreakFeature)
@@ -82,7 +82,7 @@ namespace GrapplingHookTweaks.Plugin
 
 		public delegate void WindowBreakHandler(PlayerManager pm, Window window);
 
-		readonly static HashSet<Type> nonAllowedClickables = [typeof(WaterFountain), typeof(Pickup), typeof(MathMachine)];
+		readonly static HashSet<Type> nonAllowedClickables = [typeof(WaterFountain), typeof(Pickup), typeof(MathMachine), typeof(HideableLocker)];
 
 
 		[HarmonyPatch("Use")]
@@ -90,12 +90,42 @@ namespace GrapplingHookTweaks.Plugin
 		private static void AddComponentThere(ITM_GrapplingHook __instance) =>
 			__instance.gameObject.AddComponent<GrapplingHookExtraComponent>();
 
-
+		public static void AddNonAllowedClickable(Type t) => nonAllowedClickables.Add(t); // Useful for mods
 	}
 
 	class GrapplingHookExtraComponent : MonoBehaviour
 	{
 		readonly public List<IClickable<int>> usedClickables = []; // Just to not repeat the same clickable
 		readonly public List<Transform> interactedTransforms = [];
+	}
+
+	// ********** NPC Patches ************
+
+	[HarmonyPatch(typeof(NPC), "EntityTriggerEnter")]
+	internal class GotHitByGrapplingHook
+	{
+		private static void Prefix(NPC __instance, Collider other)
+		{
+			if (other.CompareTag("GrapplingHook"))
+				__instance.Navigator.Entity.AddForce(new(other.transform.right, 15f, -12f));
+		}
+	}
+
+	// ******** Gum Patch *******
+	[HarmonyPatch(typeof(Gum), "EntityTriggerEnter")]
+	internal class GumGotHitByGrapplingHook
+	{
+		private static bool Prefix(Gum __instance, Collider other, bool ___flying, AudioManager ___audMan, SoundObject ___audSplat, Beans ___beans)
+		{
+			if (___flying && other.CompareTag("GrapplingHook"))
+			{
+				__instance.Hide();
+				___beans.GumHit(__instance, false);
+				___audMan.FlushQueue(true);
+				___audMan.PlaySingle(___audSplat);
+				return false;
+			}
+			return true;
+		}
 	}
 }
