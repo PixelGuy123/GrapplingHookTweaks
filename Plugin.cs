@@ -14,6 +14,9 @@ namespace GrapplingHookTweaks.Plugin
 			Harmony h = new(ModInfo.PLUGIN_GUID);
 			h.PatchAll();
 		}
+
+		public static bool disableWindowBreakFeature = false; // Endless Floors Comp :)
+		public static bool disableDoorOpeningFeature = false; // Maybe Endless Floors too???
 	}
 
 	static class ModInfo
@@ -33,35 +36,43 @@ namespace GrapplingHookTweaks.Plugin
 		[HarmonyPrefix]
 		private static bool CheckForPassableObjects(ITM_GrapplingHook __instance, PlayerManager ___pm, ref RaycastHit hit, LayerMaskObject ___layerMask, bool ___locked, float ___speed, EnvironmentController ___ec) // anything in here should make the grappling hook pass so it doesn't lock in it
 		{
+			if (BasePlugin.disableDoorOpeningFeature && BasePlugin.disableWindowBreakFeature)
+				return true;
+
 			var comp = __instance.GetComponent<GrapplingHookExtraComponent>();
+			if (!BasePlugin.disableWindowBreakFeature)
+			{
+				if (!___locked && ___layerMask.Contains(hit.collider.gameObject.layer) && hit.transform.parent.CompareTag("Window") && !comp.interactedTransforms.Contains(hit.transform.parent))
+				{ // Window stuff
+					var w = hit.transform.parent.GetComponent<Window>();
+					if (w != null)
+					{
+						w.Break(true);
+						comp.interactedTransforms.Add(hit.transform.parent);
+						OnWindowBreak?.Invoke(___pm, w);
 
-			if (!___locked && ___layerMask.Contains(hit.collider.gameObject.layer) && hit.transform.parent.CompareTag("Window") && !comp.interactedTransforms.Contains(hit.transform.parent))
-			{ // Window stuff
-				var w = hit.transform.parent.GetComponent<Window>();
-				if (w != null)
-				{
-					w.Break(true);
-					comp.interactedTransforms.Add(hit.transform.parent);
-					OnWindowBreak?.Invoke(___pm, w);
-
-					__instance.transform.position += __instance.transform.forward * ___speed * ___ec.EnvironmentTimeScale;
-					return false;
+						__instance.transform.position += __instance.transform.forward * ___speed * ___ec.EnvironmentTimeScale;
+						return false;
+					}
 				}
 			}
 
-			var clickable = hit.transform.parent.GetComponent<IClickable<int>>(); // IClickable stuff
-			clickable ??= hit.transform.GetComponent<IClickable<int>>(); // If clickable is on the obj itself
-
-
-			if (clickable != null && !nonAllowedClickables.Contains(clickable.GetType()) && !comp.usedClickables.Contains(clickable) && !clickable.ClickableHidden()
-				&& (!clickable.ClickableRequiresNormalHeight() || (clickable.ClickableRequiresNormalHeight() && !___pm.plm.Entity.Squished)))
+			if (!BasePlugin.disableDoorOpeningFeature)
 			{
-				clickable.Clicked(___pm.playerNumber);
-				comp.usedClickables.Add(clickable);
-				if (!hit.collider.isTrigger)
-					__instance.transform.position += __instance.transform.forward * ___speed * ___ec.EnvironmentTimeScale;
+				var clickable = hit.transform.parent.GetComponent<IClickable<int>>(); // IClickable stuff
+				clickable ??= hit.transform.GetComponent<IClickable<int>>(); // If clickable is on the obj itself
 
-				return false;
+
+				if (clickable != null && !nonAllowedClickables.Contains(clickable.GetType()) && !comp.usedClickables.Contains(clickable) && !clickable.ClickableHidden()
+					&& (!clickable.ClickableRequiresNormalHeight() || (clickable.ClickableRequiresNormalHeight() && !___pm.plm.Entity.Squished)))
+				{
+					clickable.Clicked(___pm.playerNumber);
+					comp.usedClickables.Add(clickable);
+					if (!hit.collider.isTrigger)
+						__instance.transform.position += __instance.transform.forward * ___speed * ___ec.EnvironmentTimeScale;
+
+					return false;
+				}
 			}
 
 			return true;
