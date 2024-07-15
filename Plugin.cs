@@ -25,7 +25,7 @@ namespace GrapplingHookTweaks.Plugin
 
 		public const string PLUGIN_NAME = "Grappling Hook Tweaks";
 
-		public const string PLUGIN_VERSION = "1.0.0";
+		public const string PLUGIN_VERSION = "1.0.1";
 	}
 
 	// *********** Grappling Hook Patches ***********
